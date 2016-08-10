@@ -1095,6 +1095,9 @@
 				GCC_WARN_UNUSED_VALUE = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = (
+					./dyld/include,
+					./cctools/include,
+					./llvm/include,
 					"$(DT_TOOLCHAIN_DIR)/usr/local/include",
 					"$(DEVELOPER_DIR)/usr/local/include",
 					"$(DEVELOPER_DIR)/usr/include",
@@ -1117,7 +1120,7 @@
 				);
 				PREBINDING = NO;
 				PRODUCT_NAME = ld;
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 				SECTORDER_FLAGS = "";
 				VERSIONING_SYSTEM = "apple-generic";
 				WARNING_CFLAGS = "-Wall";
@@ -1170,6 +1173,9 @@
 				GCC_WARN_UNUSED_VALUE = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = (
+					./dyld/include,
+					./cctools/include,
+					./llvm/include,
 					"$(DT_TOOLCHAIN_DIR)/usr/local/include",
 					"$(DEVELOPER_DIR)/usr/local/include",
 					"$(DEVELOPER_DIR)/usr/include",
@@ -1189,7 +1195,7 @@
 				);
 				PREBINDING = NO;
 				PRODUCT_NAME = ld;
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 				SECTORDER_FLAGS = "";
 				STRIP_INSTALLED_PRODUCT = YES;
 				STRIP_STYLE = debugging;
@@ -1382,6 +1388,9 @@
 				GCC_WARN_UNUSED_VALUE = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = (
+					./dyld/include,
+					./cctools/include,
+					./llvm/include,
 					"$(DT_TOOLCHAIN_DIR)/usr/local/include",
 					"$(DEVELOPER_DIR)/usr/local/include",
 					"$(DEVELOPER_DIR)/usr/include",
@@ -1401,7 +1410,7 @@
 				);
 				PREBINDING = NO;
 				PRODUCT_NAME = ld;
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 				SECTORDER_FLAGS = "";
 				STRIP_INSTALLED_PRODUCT = YES;
 				STRIP_STYLE = debugging;
