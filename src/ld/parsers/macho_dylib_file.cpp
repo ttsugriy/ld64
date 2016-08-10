@@ -687,7 +687,7 @@ bool isDylibFile(const uint8_t* fileContent, cpu_type_t* result, cpu_subtype_t* 
 	}
 	if ( Parser<x86>::validFile(fileContent, false) ) {
 		*result = CPU_TYPE_I386;
-		*subResult = CPU_SUBTYPE_X86_ALL;
+		*subResult = CPU_SUBTYPE_I386_ALL;
 		return true;
 	}
 	if ( Parser<arm>::validFile(fileContent, false) ) {
