@@ -1,0 +1,9 @@
+[submodule "dyld"]
+	path = dyld
+	url = https://github.com/ttsugriy/dyld.git
+[submodule "cctools"]
+	path = cctools
+	url = https://github.com/ttsugriy/cctools.git
+[submodule "llvm"]
+	path = llvm
+	url = https://github.com/llvm-mirror/llvm.git
