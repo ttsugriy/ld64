@@ -1225,6 +1225,9 @@
 				GCC_WARN_UNUSED_VALUE = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = (
+					./dyld/include,
+					./cctools/include,
+					./llvm/include,
 					"$(SRCROOT)/src/ld",
 					"$(DEVELOPER_DIR)/usr/local/include",
 					"$(DT_TOOLCHAIN_DIR)/usr/local/include",
@@ -1242,7 +1245,7 @@
 				OTHER_REZFLAGS = "";
 				PREBINDING = NO;
 				PRODUCT_NAME = ObjectDump;
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 				SECTORDER_FLAGS = "";
 				WARNING_CFLAGS = (
 					"-Wmost",
@@ -1264,6 +1267,9 @@
 				GCC_OPTIMIZATION_LEVEL = s;
 				GCC_PREPROCESSOR_DEFINITIONS = NDEBUG;
 				HEADER_SEARCH_PATHS = (
+					./dyld/include,
+					./cctools/include,
+					./llvm/include,
 					"$(SRCROOT)/src/ld",
 					"$(DEVELOPER_DIR)/usr/local/include",
 					"$(DT_TOOLCHAIN_DIR)/usr/local/include",
@@ -1280,7 +1286,7 @@
 				OTHER_REZFLAGS = "";
 				PREBINDING = NO;
 				PRODUCT_NAME = ObjectDump;
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 				WARNING_CFLAGS = (
 					"-Wmost",
 					"-Wno-four-char-constants",
@@ -1429,12 +1435,12 @@
 				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
 				GCC_MODEL_TUNING = G5;
 				GCC_PREPROCESSOR_DEFINITIONS = "$(GCC_PREPROCESSOR_DEFINITIONS_$(RC_RELEASE))";
-				HEADER_SEARCH_PATHS = "";
+				HEADER_SEARCH_PATHS = ./cctools/include;
 				INSTALL_PATH = "$(DT_VARIANT)/$(DT_TOOLCHAIN_DIR)/usr/bin";
 				OTHER_LDFLAGS = "-Wl,-exported_symbol,__mh_execute_header";
 				PREBINDING = NO;
 				PRODUCT_NAME = rebase;
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 				STRIP_INSTALLED_PRODUCT = YES;
 				STRIP_STYLE = debugging;
 				VALID_ARCHS = "i386 ppc x86_64";
@@ -1451,7 +1457,7 @@
 				GCC_MODEL_TUNING = G5;
 				GCC_WARN_ABOUT_INVALID_OFFSETOF_MACRO = NO;
 				GCC_WARN_TYPECHECK_CALLS_TO_PRINTF = YES;
-				HEADER_SEARCH_PATHS = "";
+				HEADER_SEARCH_PATHS = ./cctools/include;
 				INSTALL_PATH = "$(DT_VARIANT)/$(DT_TOOLCHAIN_DIR)/usr/bin";
 				OTHER_CPLUSPLUSFLAGS = (
 					"-stdlib=libc++",
@@ -1463,7 +1469,7 @@
 				);
 				PREBINDING = NO;
 				PRODUCT_NAME = unwinddump;
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 				STRIP_INSTALLED_PRODUCT = YES;
 				STRIP_STYLE = debugging;
 			};
@@ -1482,6 +1488,9 @@
 				GCC_PREPROCESSOR_DEFINITIONS = NDEBUG;
 				GCC_WARN_ABOUT_INVALID_OFFSETOF_MACRO = NO;
 				HEADER_SEARCH_PATHS = (
+					./dyld/include,
+					./cctools/include,
+					./llvm/include,
 					"$(SRCROOT)/src/ld",
 					"$(DEVELOPER_DIR)/usr/local/include",
 					"$(DT_TOOLCHAIN_DIR)/usr/local/include",
@@ -1498,7 +1507,7 @@
 				OTHER_REZFLAGS = "";
 				PREBINDING = NO;
 				PRODUCT_NAME = ObjectDump;
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 				WARNING_CFLAGS = (
 					"-Wmost",
 					"-Wno-four-char-constants",
@@ -1515,7 +1524,7 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
 				GCC_MODEL_TUNING = G5;
-				HEADER_SEARCH_PATHS = "";
+				HEADER_SEARCH_PATHS = ./cctools/include;
 				INSTALL_PATH = "$(DT_VARIANT)/$(DT_TOOLCHAIN_DIR)/usr/local/bin";
 				OTHER_CPLUSPLUSFLAGS = (
 					"-stdlib=libc++",
@@ -1524,7 +1533,7 @@
 				OTHER_LDFLAGS = "-stdlib=libc++";
 				PREBINDING = NO;
 				PRODUCT_NAME = machocheck;
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 			};
 			name = "Release-assert";
 		};
@@ -1537,6 +1546,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				GCC_ENABLE_FIX_AND_CONTINUE = NO;
 				GCC_MODEL_TUNING = G5;
+				HEADER_SEARCH_PATHS = ./cctools/include;
 				INSTALL_PATH = "$(DT_VARIANT)/$(DT_TOOLCHAIN_DIR)/usr/bin";
 				OTHER_CPLUSPLUSFLAGS = (
 					"-stdlib=libc++",
@@ -1545,7 +1555,7 @@
 				OTHER_LDFLAGS = "-stdlib=libc++";
 				PREBINDING = NO;
 				PRODUCT_NAME = dyldinfo;
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 				STRIP_INSTALLED_PRODUCT = YES;
 				STRIP_STYLE = debugging;
 				ZERO_LINK = NO;
@@ -1655,6 +1665,7 @@
 				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_WARN_ABOUT_INVALID_OFFSETOF_MACRO = NO;
 				GCC_WARN_TYPECHECK_CALLS_TO_PRINTF = YES;
+				HEADER_SEARCH_PATHS = ./cctools/include;
 				INSTALL_PATH = "$(DT_VARIANT)/$(DT_TOOLCHAIN_DIR)/usr/bin";
 				OTHER_CPLUSPLUSFLAGS = (
 					"-stdlib=libc++",
@@ -1663,7 +1674,7 @@
 				OTHER_LDFLAGS = "-stdlib=libc++";
 				PREBINDING = NO;
 				PRODUCT_NAME = unwinddump;
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 			};
 			name = Debug;
 		};
@@ -1677,7 +1688,7 @@
 				GCC_MODEL_TUNING = G5;
 				GCC_WARN_ABOUT_INVALID_OFFSETOF_MACRO = NO;
 				GCC_WARN_TYPECHECK_CALLS_TO_PRINTF = YES;
-				HEADER_SEARCH_PATHS = "";
+				HEADER_SEARCH_PATHS = ./cctools/include;
 				INSTALL_PATH = "$(DT_VARIANT)/$(DT_TOOLCHAIN_DIR)/usr/bin";
 				OTHER_CPLUSPLUSFLAGS = (
 					"-stdlib=libc++",
@@ -1686,7 +1697,7 @@
 				OTHER_LDFLAGS = "-Wl,-exported_symbol,__mh_execute_header";
 				PREBINDING = NO;
 				PRODUCT_NAME = unwinddump;
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 				STRIP_INSTALLED_PRODUCT = YES;
 				STRIP_STYLE = debugging;
 			};
@@ -1712,6 +1723,7 @@
 				GCC_WARN_UNUSED_LABEL = NO;
 				GCC_WARN_UNUSED_VALUE = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = ./cctools/include;
 				INSTALL_PATH = "$(DT_VARIANT)/$(DT_TOOLCHAIN_DIR)/usr/bin";
 				OTHER_CPLUSPLUSFLAGS = (
 					"-stdlib=libc++",
@@ -1720,7 +1732,7 @@
 				OTHER_LDFLAGS = "-stdlib=libc++";
 				PREBINDING = NO;
 				PRODUCT_NAME = dyldinfo;
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 				WARNING_CFLAGS = "-Wall";
 			};
 			name = Debug;
@@ -1734,6 +1746,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				GCC_ENABLE_FIX_AND_CONTINUE = NO;
 				GCC_MODEL_TUNING = G5;
+				HEADER_SEARCH_PATHS = ./cctools/include;
 				INSTALL_PATH = "$(DT_VARIANT)/$(DT_TOOLCHAIN_DIR)/usr/bin";
 				OTHER_CPLUSPLUSFLAGS = (
 					"-stdlib=libc++",
@@ -1742,7 +1755,7 @@
 				OTHER_LDFLAGS = "-stdlib=libc++";
 				PREBINDING = NO;
 				PRODUCT_NAME = dyldinfo;
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 				STRIP_INSTALLED_PRODUCT = YES;
 				STRIP_STYLE = debugging;
 				ZERO_LINK = NO;
@@ -1758,6 +1771,7 @@
 				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
 				GCC_MODEL_TUNING = G5;
 				GCC_OPTIMIZATION_LEVEL = 0;
+				HEADER_SEARCH_PATHS = ./cctools/include;
 				INSTALL_PATH = "$(DT_VARIANT)/$(DT_TOOLCHAIN_DIR)/usr/local/bin";
 				OTHER_CPLUSPLUSFLAGS = (
 					"-stdlib=libc++",
@@ -1766,7 +1780,7 @@
 				OTHER_LDFLAGS = "-stdlib=libc++";
 				PREBINDING = NO;
 				PRODUCT_NAME = machocheck;
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 			};
 			name = Debug;
 		};
@@ -1778,7 +1792,7 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
 				GCC_MODEL_TUNING = G5;
-				HEADER_SEARCH_PATHS = "";
+				HEADER_SEARCH_PATHS = ./cctools/include;
 				INSTALL_PATH = "$(DT_VARIANT)/$(DT_TOOLCHAIN_DIR)/usr/local/bin";
 				OTHER_CPLUSPLUSFLAGS = (
 					"-stdlib=libc++",
@@ -1787,7 +1801,7 @@
 				OTHER_LDFLAGS = "-stdlib=libc++";
 				PREBINDING = NO;
 				PRODUCT_NAME = machocheck;
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 			};
 			name = Release;
 		};
@@ -1801,10 +1815,11 @@
 				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
 				GCC_MODEL_TUNING = G5;
 				GCC_OPTIMIZATION_LEVEL = 0;
+				HEADER_SEARCH_PATHS = ./cctools/include;
 				INSTALL_PATH = "$(DT_VARIANT)/$(DT_TOOLCHAIN_DIR)/usr/bin";
 				PREBINDING = NO;
 				PRODUCT_NAME = rebase;
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 			};
 			name = Debug;
 		};
@@ -1817,12 +1832,12 @@
 				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
 				GCC_MODEL_TUNING = G5;
 				GCC_PREPROCESSOR_DEFINITIONS = "$(GCC_PREPROCESSOR_DEFINITIONS_$(RC_RELEASE))";
-				HEADER_SEARCH_PATHS = "";
+				HEADER_SEARCH_PATHS = ./cctools/include;
 				INSTALL_PATH = "$(DT_VARIANT)/$(DT_TOOLCHAIN_DIR)/usr/bin";
 				OTHER_LDFLAGS = "-Wl,-exported_symbol,__mh_execute_header";
 				PREBINDING = NO;
 				PRODUCT_NAME = rebase;
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 				STRIP_INSTALLED_PRODUCT = YES;
 				STRIP_STYLE = debugging;
 				VALID_ARCHS = "i386 ppc x86_64";
