@@ -90,8 +90,6 @@ private:
 	typedef std::map<const ld::Atom*, const ld::Atom*> AtomToAtom;
 	
 	typedef std::map<const ld::Atom*, uint32_t> AtomToOrdinal;
-	
-	std::set<const ld::Atom*> _rebasedAtoms;
 
 	const ld::Atom*		findAtom(const Options::OrderedSymbol& orderedSymbol);
 	void				buildNameTable();
@@ -106,7 +104,7 @@ private:
 
 	void buildRebasedAtoms();
 	bool isPcRelStore(ld::Fixup::Kind kind);
-	void addDyldInfo(ld::Internal& state,  ld::Internal::FinalSection* sect, const ld::Atom* atom,
+	void noteRebaseInfo(ld::Internal& state,  ld::Internal::FinalSection* sect, const ld::Atom* atom,
 							 ld::Fixup* fixupWithTarget, ld::Fixup* fixupWithMinusTarget, ld::Fixup* fixupWithStore,
 							 const ld::Atom* target, const ld::Atom* minusTarget,
 					 uint64_t targetAddend, uint64_t minusTargetAddend);
@@ -120,6 +118,8 @@ private:
 	AtomToOrdinal						_ordinalOverrideMap;
 	Comparer							_comparer;
 	bool								_haveOrderFile;
+	std::set<const ld::Atom*>			_rebasedAtoms;
+	bool								_compactRebaseInfo;
 
 	static bool							_s_log;
 };
@@ -127,7 +127,7 @@ private:
 bool Layout::_s_log = false;
 
 Layout::Layout(const Options& opts, ld::Internal& state)
-	: _options(opts), _state(state), _comparer(*this, state), _haveOrderFile(opts.orderedSymbolsCount() != 0)
+	: _options(opts), _state(state), _comparer(*this, state), _haveOrderFile(opts.orderedSymbolsCount() != 0), _compactRebaseInfo(false)
 {
 }
 
@@ -349,7 +349,7 @@ void Layout::buildRebasedAtoms()
 					if ( (fixupWithStore != NULL) && (target != NULL) ) {
 						if ( _options.outputKind() != Options::kObjectFile ) {
 							if ( _options.makeCompressedDyldInfo() ) {
-								this->addDyldInfo(_state, sect, atom, fixupWithTarget, fixupWithMinusTarget, fixupWithStore,
+								this->noteRebaseInfo(_state, sect, atom, fixupWithTarget, fixupWithMinusTarget, fixupWithStore,
 												  target, minusTarget, targetAddend, minusTargetAddend);
 							}
 						}
@@ -358,11 +358,10 @@ void Layout::buildRebasedAtoms()
 			}
 		}
 	}
-	fprintf(stderr, "Number of relocated atoms: %ld\n", _rebasedAtoms.size());
 }
 
 
-void Layout::addDyldInfo(ld::Internal& state,  ld::Internal::FinalSection* sect, const ld::Atom* atom,
+void Layout::noteRebaseInfo(ld::Internal& state,  ld::Internal::FinalSection* sect, const ld::Atom* atom,
 							 ld::Fixup* fixupWithTarget, ld::Fixup* fixupWithMinusTarget, ld::Fixup* fixupWithStore,
 							 const ld::Atom* target, const ld::Atom* minusTarget,
 							 uint64_t targetAddend, uint64_t minusTargetAddend)
@@ -533,7 +532,7 @@ bool Layout::Comparer::operator()(const ld::Atom* left, const ld::Atom* right)
 		}
 	}
 
-	if (true) {
+	if ( _layout._compactRebaseInfo ) {
 		auto leftPos  = _layout._rebasedAtoms.find(left);
 		auto rightPos = _layout._rebasedAtoms.find(right);
 		auto end = _layout._rebasedAtoms.end();
