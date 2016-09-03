@@ -91,6 +91,8 @@ private:
 	
 	typedef std::map<const ld::Atom*, uint32_t> AtomToOrdinal;
 	
+	std::set<const ld::Atom*> _rebasedAtoms;
+
 	const ld::Atom*		findAtom(const Options::OrderedSymbol& orderedSymbol);
 	void				buildNameTable();
 	void				buildFollowOnTables();
@@ -99,6 +101,16 @@ private:
 	static bool			matchesObjectFile(const ld::Atom* atom, const char* objectFileLeafName);
 			bool		possibleToOrder(const ld::Internal::FinalSection*);
 	
+	bool setsTarget(ld::Fixup::Kind kind);
+	bool isStore(ld::Fixup::Kind kind);
+
+	void buildRebasedAtoms();
+	bool isPcRelStore(ld::Fixup::Kind kind);
+	void addDyldInfo(ld::Internal& state,  ld::Internal::FinalSection* sect, const ld::Atom* atom,
+							 ld::Fixup* fixupWithTarget, ld::Fixup* fixupWithMinusTarget, ld::Fixup* fixupWithStore,
+							 const ld::Atom* target, const ld::Atom* minusTarget,
+					 uint64_t targetAddend, uint64_t minusTargetAddend);
+
 	const Options&						_options;
 	ld::Internal&						_state;
 	AtomToAtom							_followOnStarts;
@@ -119,6 +131,506 @@ Layout::Layout(const Options& opts, ld::Internal& state)
 {
 }
 
+bool Layout::isPcRelStore(ld::Fixup::Kind kind)
+{
+	switch ( kind ) {
+		case ld::Fixup::kindStoreX86BranchPCRel8:
+		case ld::Fixup::kindStoreX86BranchPCRel32:
+		case ld::Fixup::kindStoreX86PCRel8:
+		case ld::Fixup::kindStoreX86PCRel16:
+		case ld::Fixup::kindStoreX86PCRel32:
+		case ld::Fixup::kindStoreX86PCRel32_1:
+		case ld::Fixup::kindStoreX86PCRel32_2:
+		case ld::Fixup::kindStoreX86PCRel32_4:
+		case ld::Fixup::kindStoreX86PCRel32GOTLoad:
+		case ld::Fixup::kindStoreX86PCRel32GOTLoadNowLEA:
+		case ld::Fixup::kindStoreX86PCRel32GOT:
+		case ld::Fixup::kindStoreX86PCRel32TLVLoad:
+		case ld::Fixup::kindStoreX86PCRel32TLVLoadNowLEA:
+		case ld::Fixup::kindStoreARMBranch24:
+		case ld::Fixup::kindStoreThumbBranch22:
+		case ld::Fixup::kindStoreARMLoad12:
+		case ld::Fixup::kindStoreTargetAddressX86PCRel32:
+		case ld::Fixup::kindStoreTargetAddressX86PCRel32GOTLoad:
+		case ld::Fixup::kindStoreTargetAddressX86PCRel32GOTLoadNowLEA:
+		case ld::Fixup::kindStoreTargetAddressX86PCRel32TLVLoad:
+		case ld::Fixup::kindStoreTargetAddressX86PCRel32TLVLoadNowLEA:
+		case ld::Fixup::kindStoreTargetAddressARMBranch24:
+		case ld::Fixup::kindStoreTargetAddressThumbBranch22:
+		case ld::Fixup::kindStoreTargetAddressARMLoad12:
+#if SUPPORT_ARCH_arm64
+		case ld::Fixup::kindStoreARM64Page21:
+		case ld::Fixup::kindStoreARM64PageOff12:
+		case ld::Fixup::kindStoreARM64GOTLoadPage21:
+		case ld::Fixup::kindStoreARM64GOTLoadPageOff12:
+		case ld::Fixup::kindStoreARM64GOTLeaPage21:
+		case ld::Fixup::kindStoreARM64GOTLeaPageOff12:
+		case ld::Fixup::kindStoreARM64TLVPLoadPage21:
+		case ld::Fixup::kindStoreARM64TLVPLoadPageOff12:
+		case ld::Fixup::kindStoreARM64TLVPLoadNowLeaPage21:
+		case ld::Fixup::kindStoreARM64TLVPLoadNowLeaPageOff12:
+		case ld::Fixup::kindStoreARM64PCRelToGOT:
+		case ld::Fixup::kindStoreTargetAddressARM64Page21:
+		case ld::Fixup::kindStoreTargetAddressARM64PageOff12:
+		case ld::Fixup::kindStoreTargetAddressARM64GOTLoadPage21:
+		case ld::Fixup::kindStoreTargetAddressARM64GOTLoadPageOff12:
+		case ld::Fixup::kindStoreTargetAddressARM64GOTLeaPage21:
+		case ld::Fixup::kindStoreTargetAddressARM64GOTLeaPageOff12:
+		case ld::Fixup::kindStoreTargetAddressARM64TLVPLoadPage21:
+		case ld::Fixup::kindStoreTargetAddressARM64TLVPLoadPageOff12:
+		case ld::Fixup::kindStoreTargetAddressARM64TLVPLoadNowLeaPage21:
+		case ld::Fixup::kindStoreTargetAddressARM64TLVPLoadNowLeaPageOff12:
+#endif
+			return true;
+		case ld::Fixup::kindStoreTargetAddressX86BranchPCRel32:
+#if SUPPORT_ARCH_arm64
+		case ld::Fixup::kindStoreTargetAddressARM64Branch26:
+#endif
+			return (_options.outputKind() != Options::kKextBundle);
+		default:
+			break;
+	}
+	return false;
+}
+
+bool Layout::isStore(ld::Fixup::Kind kind)
+{
+	switch ( kind ) {
+		case ld::Fixup::kindNone:
+		case ld::Fixup::kindNoneFollowOn:
+		case ld::Fixup::kindNoneGroupSubordinate:
+		case ld::Fixup::kindNoneGroupSubordinateFDE:
+		case ld::Fixup::kindNoneGroupSubordinateLSDA:
+		case ld::Fixup::kindNoneGroupSubordinatePersonality:
+		case ld::Fixup::kindSetTargetAddress:
+		case ld::Fixup::kindSubtractTargetAddress:
+		case ld::Fixup::kindAddAddend:
+		case ld::Fixup::kindSubtractAddend:
+		case ld::Fixup::kindSetTargetImageOffset:
+		case ld::Fixup::kindSetTargetSectionOffset:
+			return false;
+		default:
+			break;
+	}
+	return true;
+}
+
+bool Layout::setsTarget(ld::Fixup::Kind kind)
+{
+	switch ( kind ) {
+		case ld::Fixup::kindSetTargetAddress:
+		case ld::Fixup::kindLazyTarget:
+		case ld::Fixup::kindStoreTargetAddressLittleEndian32:
+		case ld::Fixup::kindStoreTargetAddressLittleEndian64:
+		case ld::Fixup::kindStoreTargetAddressBigEndian32:
+		case ld::Fixup::kindStoreTargetAddressBigEndian64:
+		case ld::Fixup::kindStoreTargetAddressX86PCRel32:
+		case ld::Fixup::kindStoreTargetAddressX86BranchPCRel32:
+		case ld::Fixup::kindStoreTargetAddressX86PCRel32GOTLoad:
+		case ld::Fixup::kindStoreTargetAddressX86PCRel32GOTLoadNowLEA:
+		case ld::Fixup::kindStoreTargetAddressX86PCRel32TLVLoad:
+		case ld::Fixup::kindStoreTargetAddressX86PCRel32TLVLoadNowLEA:
+		case ld::Fixup::kindStoreTargetAddressX86Abs32TLVLoad:
+		case ld::Fixup::kindStoreTargetAddressARMBranch24:
+		case ld::Fixup::kindStoreTargetAddressThumbBranch22:
+		case ld::Fixup::kindStoreTargetAddressARMLoad12:
+#if SUPPORT_ARCH_arm64
+		case ld::Fixup::kindStoreTargetAddressARM64Branch26:
+		case ld::Fixup::kindStoreTargetAddressARM64Page21:
+		case ld::Fixup::kindStoreTargetAddressARM64PageOff12:
+		case ld::Fixup::kindStoreTargetAddressARM64GOTLoadPage21:
+		case ld::Fixup::kindStoreTargetAddressARM64GOTLoadPageOff12:
+		case ld::Fixup::kindStoreTargetAddressARM64GOTLeaPage21:
+		case ld::Fixup::kindStoreTargetAddressARM64GOTLeaPageOff12:
+		case ld::Fixup::kindStoreTargetAddressARM64TLVPLoadPage21:
+		case ld::Fixup::kindStoreTargetAddressARM64TLVPLoadPageOff12:
+		case ld::Fixup::kindStoreTargetAddressARM64TLVPLoadNowLeaPage21:
+		case ld::Fixup::kindStoreTargetAddressARM64TLVPLoadNowLeaPageOff12:
+#endif
+			return true;
+		case ld::Fixup::kindStoreX86DtraceCallSiteNop:
+		case ld::Fixup::kindStoreX86DtraceIsEnableSiteClear:
+		case ld::Fixup::kindStoreARMDtraceCallSiteNop:
+		case ld::Fixup::kindStoreARMDtraceIsEnableSiteClear:
+		case ld::Fixup::kindStoreARM64DtraceCallSiteNop:
+		case ld::Fixup::kindStoreARM64DtraceIsEnableSiteClear:
+		case ld::Fixup::kindStoreThumbDtraceCallSiteNop:
+		case ld::Fixup::kindStoreThumbDtraceIsEnableSiteClear:
+			return (_options.outputKind() == Options::kObjectFile);
+		default:
+			break;
+	}
+	return false;
+}
+
+void Layout::buildRebasedAtoms()
+{
+	for (std::vector<ld::Internal::FinalSection*>::iterator sit = _state.sections.begin(); sit != _state.sections.end(); ++sit) {
+		ld::Internal::FinalSection* sect = *sit;
+		// record end of last __TEXT section encrypted iPhoneOS apps.
+		if ( _options.makeEncryptable() && (strcmp(sect->segmentName(), "__TEXT") == 0) ) {
+//			_encryptedTEXTendOffset = pageAlign(sect->fileOffset + sect->size);
+		}
+		bool objc1ClassRefSection = ( (sect->type() == ld::Section::typeCStringPointer)
+									 && (strcmp(sect->sectionName(), "__cls_refs") == 0)
+									 && (strcmp(sect->segmentName(), "__OBJC") == 0) );
+		for (std::vector<const ld::Atom*>::iterator ait = sect->atoms.begin(); ait != sect->atoms.end(); ++ait) {
+			const ld::Atom*		atom = *ait;
+
+			// Record regular atoms that override a dylib's weak definitions
+			if ( (atom->scope() == ld::Atom::scopeGlobal) && atom->overridesDylibsWeakDef() ) {
+				if ( _options.makeCompressedDyldInfo() ) {
+//					uint8_t wtype = BIND_TYPE_OVERRIDE_OF_WEAKDEF_IN_DYLIB;
+//					bool nonWeakDef = (atom->combine() == ld::Atom::combineNever);
+//					_weakBindingInfo.push_back(BindingInfo(wtype, atom->name(), nonWeakDef, atom->finalAddress(), 0));
+				}
+//				this->overridesWeakExternalSymbols = true;
+				if ( _options.warnWeakExports()	)
+					warning("overrides weak external symbol: %s", atom->name());
+			}
+
+			ld::Fixup*			fixupWithTarget = NULL;
+			ld::Fixup*			fixupWithMinusTarget = NULL;
+			ld::Fixup*			fixupWithStore = NULL;
+			ld::Fixup*			fixupWithAddend = NULL;
+			const ld::Atom*		target = NULL;
+			const ld::Atom*		minusTarget = NULL;
+			uint64_t			targetAddend = 0;
+			uint64_t			minusTargetAddend = 0;
+			for (ld::Fixup::iterator fit = atom->fixupsBegin(); fit != atom->fixupsEnd(); ++fit) {
+				if ( fit->firstInCluster() ) {
+					fixupWithTarget = NULL;
+					fixupWithMinusTarget = NULL;
+					fixupWithStore = NULL;
+					target = NULL;
+					minusTarget = NULL;
+					targetAddend = 0;
+					minusTargetAddend = 0;
+				}
+				if ( this->setsTarget(fit->kind) ) {
+					switch ( fit->binding ) {
+						case ld::Fixup::bindingNone:
+						case ld::Fixup::bindingByNameUnbound:
+							break;
+						case ld::Fixup::bindingByContentBound:
+						case ld::Fixup::bindingDirectlyBound:
+							fixupWithTarget = fit;
+							target = fit->u.target;
+							break;
+						case ld::Fixup::bindingsIndirectlyBound:
+							fixupWithTarget = fit;
+							target = _state.indirectBindingTable[fit->u.bindingIndex];
+							break;
+					}
+					assert(target != NULL);
+				}
+				switch ( fit->kind ) {
+					case ld::Fixup::kindAddAddend:
+						targetAddend = fit->u.addend;
+						fixupWithAddend = fit;
+						break;
+					case ld::Fixup::kindSubtractAddend:
+						minusTargetAddend = fit->u.addend;
+						fixupWithAddend = fit;
+						break;
+					case ld::Fixup::kindSubtractTargetAddress:
+						switch ( fit->binding ) {
+							case ld::Fixup::bindingNone:
+							case ld::Fixup::bindingByNameUnbound:
+								break;
+							case ld::Fixup::bindingByContentBound:
+							case ld::Fixup::bindingDirectlyBound:
+								fixupWithMinusTarget = fit;
+								minusTarget = fit->u.target;
+								break;
+							case ld::Fixup::bindingsIndirectlyBound:
+								fixupWithMinusTarget = fit;
+								minusTarget = _state.indirectBindingTable[fit->u.bindingIndex];
+								break;
+						}
+						assert(minusTarget != NULL);
+						break;
+					case ld::Fixup::kindDataInCodeStartData:
+					case ld::Fixup::kindDataInCodeStartJT8:
+					case ld::Fixup::kindDataInCodeStartJT16:
+					case ld::Fixup::kindDataInCodeStartJT32:
+					case ld::Fixup::kindDataInCodeStartJTA32:
+					case ld::Fixup::kindDataInCodeEnd:
+//						hasDataInCode = true;
+						break;
+					default:
+						break;
+				}
+				if ( this->isStore(fit->kind) ) {
+					fixupWithStore = fit;
+				}
+				if ( fit->lastInCluster() ) {
+					if ( (fixupWithStore != NULL) && (target != NULL) ) {
+						if ( _options.outputKind() == Options::kObjectFile ) {
+//							this->addSectionRelocs(state, sect, atom, fixupWithTarget, fixupWithMinusTarget, fixupWithAddend, fixupWithStore,
+//												   target, minusTarget, targetAddend, minusTargetAddend);
+						}
+						else {
+							if ( _options.makeCompressedDyldInfo() ) {
+								this->addDyldInfo(_state, sect, atom, fixupWithTarget, fixupWithMinusTarget, fixupWithStore,
+												  target, minusTarget, targetAddend, minusTargetAddend);
+							}
+							else {
+//								this->addClassicRelocs(state, sect, atom, fixupWithTarget, fixupWithMinusTarget, fixupWithStore,
+//													   target, minusTarget, targetAddend, minusTargetAddend);
+							}
+						}
+					}
+					else if ( objc1ClassRefSection && (target != NULL) && (fixupWithStore == NULL) ) {
+						// check for class refs to lazy loaded dylibs
+						const ld::dylib::File* dylib = dynamic_cast<const ld::dylib::File*>(target->file());
+						if ( (dylib != NULL) && dylib->willBeLazyLoadedDylib() )
+							throwf("illegal class reference to %s in lazy loaded dylib %s", target->name(), dylib->path());
+					}
+				}
+			}
+		}
+	}
+	fprintf(stderr, "Number of relocated atoms: %ld\n", _rebasedAtoms.size());
+}
+
+
+void Layout::addDyldInfo(ld::Internal& state,  ld::Internal::FinalSection* sect, const ld::Atom* atom,
+							 ld::Fixup* fixupWithTarget, ld::Fixup* fixupWithMinusTarget, ld::Fixup* fixupWithStore,
+							 const ld::Atom* target, const ld::Atom* minusTarget,
+							 uint64_t targetAddend, uint64_t minusTargetAddend)
+{
+	if ( sect->isSectionHidden() )
+		return;
+
+	// no need to rebase or bind PCRel stores
+	if ( this->isPcRelStore(fixupWithStore->kind) ) {
+		// as long as target is in same linkage unit
+		if ( (target == NULL) || (target->definition() != ld::Atom::definitionProxy) ) {
+			// make sure target is not global and weak
+			if ( (target->scope() == ld::Atom::scopeGlobal) && (target->combine() == ld::Atom::combineByName) && (target->definition() == ld::Atom::definitionRegular)) {
+				if ( (atom->section().type() == ld::Section::typeCFI)
+					|| (atom->section().type() == ld::Section::typeDtraceDOF)
+					|| (atom->section().type() == ld::Section::typeUnwindInfo) ) {
+					// ok for __eh_frame and __uwind_info to use pointer diffs to global weak symbols
+					return;
+				}
+				// <rdar://problem/13700961> spurious warning when weak function has reference to itself
+				if ( fixupWithTarget->binding == ld::Fixup::bindingDirectlyBound ) {
+					// ok to ignore pc-rel references within a weak function to itself
+					return;
+				}
+				// Have direct reference to weak-global.  This should be an indrect reference
+				const char* demangledName = strdup(_options.demangleSymbol(atom->name()));
+				warning("direct access in %s to global weak symbol %s means the weak symbol cannot be overridden at runtime. "
+						"This was likely caused by different translation units being compiled with different visibility settings.",
+						demangledName, _options.demangleSymbol(target->name()));
+			}
+			return;
+		}
+	}
+
+	// no need to rebase or bind PIC internal pointer diff
+	if ( minusTarget != NULL ) {
+		// with pointer diffs, both need to be in same linkage unit
+		assert(minusTarget->definition() != ld::Atom::definitionProxy);
+		assert(target != NULL);
+		assert(target->definition() != ld::Atom::definitionProxy);
+		if ( target == minusTarget ) {
+			// This is a compile time constant and could have been optimized away by compiler
+			return;
+		}
+
+		// check if target of pointer-diff is global and weak
+		if ( (target->scope() == ld::Atom::scopeGlobal) && (target->combine() == ld::Atom::combineByName) && (target->definition() == ld::Atom::definitionRegular) ) {
+			if ( (atom->section().type() == ld::Section::typeCFI)
+				|| (atom->section().type() == ld::Section::typeDtraceDOF)
+				|| (atom->section().type() == ld::Section::typeUnwindInfo) ) {
+				// ok for __eh_frame and __uwind_info to use pointer diffs to global weak symbols
+				return;
+			}
+			// Have direct reference to weak-global.  This should be an indrect reference
+			const char* demangledName = strdup(_options.demangleSymbol(atom->name()));
+			warning("direct access in %s to global weak symbol %s means the weak symbol cannot be overridden at runtime. "
+					"This was likely caused by different translation units being compiled with different visibility settings.",
+				 demangledName, _options.demangleSymbol(target->name()));
+		}
+		return;
+	}
+
+	// no need to rebase or bind an atom's references to itself if the output is not slidable
+	if ( (atom == target) && !_options.outputSlidable() )
+		return;
+
+	// cluster has no target, so needs no rebasing or binding
+	if ( target == NULL )
+		return;
+
+	bool inReadOnlySeg = ((_options.initialSegProtection(sect->segmentName()) & VM_PROT_WRITE) == 0);
+	bool needsRebase = false;
+	bool needsBinding = false;
+	bool needsLazyBinding = false;
+	bool needsWeakBinding = false;
+
+	uint8_t	rebaseType = REBASE_TYPE_POINTER;
+	uint8_t type = BIND_TYPE_POINTER;
+	const ld::dylib::File* dylib = dynamic_cast<const ld::dylib::File*>(target->file());
+//	bool weak_import = (fixupWithTarget->weakImport || ((dylib != NULL) && dylib->forcedWeakLinked()));
+//	uint64_t address =  atom->finalAddress() + fixupWithTarget->offsetInAtom;
+	uint64_t addend = targetAddend - minusTargetAddend;
+
+	// special case lazy pointers
+	if ( fixupWithTarget->kind == ld::Fixup::kindLazyTarget ) {
+		assert(fixupWithTarget->u.target == target);
+		assert(addend == 0);
+		// lazy dylib lazy pointers do not have any dyld info
+		if ( atom->section().type() == ld::Section::typeLazyDylibPointer )
+			return;
+		// lazy binding to weak definitions are done differently
+		// they are directly bound to target, then have a weak bind in case of a collision
+		if ( target->combine() == ld::Atom::combineByName ) {
+			if ( target->definition() == ld::Atom::definitionProxy ) {
+				// weak def exported from another dylib
+				// must non-lazy bind to it plus have weak binding info in case of collision
+				needsBinding = true;
+				needsWeakBinding = true;
+			}
+			else {
+				// weak def in this linkage unit.
+				// just rebase, plus have weak binding info in case of collision
+				// this will be done by other cluster on lazy pointer atom
+			}
+		}
+		else if ( target->contentType() == ld::Atom::typeResolver ) {
+			// <rdar://problem/8553647> Hidden resolver functions should not have lazy binding info
+			// <rdar://problem/12629331> Resolver function run before initializers when overriding the dyld shared cache
+			// The lazy pointers used by stubs used when non-lazy binding to a resolver are not normal lazy pointers
+			// and should not be in lazy binding info.
+			needsLazyBinding = false;
+		}
+		else {
+			// normal case of a pointer to non-weak-def symbol, so can lazily bind
+			needsLazyBinding = true;
+		}
+	}
+	else {
+		// everything except lazy pointers
+		switch ( target->definition() ) {
+			case ld::Atom::definitionProxy:
+				if ( (dylib != NULL) && dylib->willBeLazyLoadedDylib() )
+					throwf("illegal data reference to %s in lazy loaded dylib %s", target->name(), dylib->path());
+				if ( target->contentType() == ld::Atom::typeTLV ) {
+					if ( sect->type() != ld::Section::typeTLVPointers )
+						throwf("illegal data reference in %s to thread local variable %s in dylib %s",
+							   atom->name(), target->name(), dylib->path());
+				}
+				if ( inReadOnlySeg )
+					type = BIND_TYPE_TEXT_ABSOLUTE32;
+				needsBinding = true;
+				if ( target->combine() == ld::Atom::combineByName )
+					needsWeakBinding = true;
+				break;
+			case ld::Atom::definitionRegular:
+			case ld::Atom::definitionTentative:
+				// only slideable images need rebasing info
+				if ( _options.outputSlidable() ) {
+					needsRebase = true;
+				}
+				// references to internal symbol never need binding
+				if ( target->scope() != ld::Atom::scopeGlobal )
+					break;
+				// reference to global weak def needs weak binding
+				if ( (target->combine() == ld::Atom::combineByName) && (target->definition() == ld::Atom::definitionRegular) )
+					needsWeakBinding = true;
+				else if ( _options.outputKind() == Options::kDynamicExecutable ) {
+					// in main executables, the only way regular symbols are indirected is if -interposable is used
+					if ( _options.interposable(target->name()) ) {
+						needsRebase = false;
+						needsBinding = true;
+					}
+				}
+				else {
+					// for flat-namespace or interposable two-level-namespace
+					// all references to exported symbols get indirected
+					if ( (_options.nameSpace() != Options::kTwoLevelNameSpace) || _options.interposable(target->name()) ) {
+						// <rdar://problem/5254468> no external relocs for flat objc classes
+						if ( strncmp(target->name(), ".objc_class_", 12) == 0 )
+							break;
+						// no rebase info for references to global symbols that will have binding info
+						needsRebase = false;
+						needsBinding = true;
+					}
+					else if ( _options.forceCoalesce(target->name()) ) {
+						needsWeakBinding = true;
+					}
+				}
+				break;
+			case ld::Atom::definitionAbsolute:
+				break;
+		}
+	}
+
+	// <rdar://problem/13828711> if target is an import alias, use base of alias
+	if ( target->isAlias() && (target->definition() == ld::Atom::definitionProxy) ) {
+		for (ld::Fixup::iterator fit = target->fixupsBegin(), end=target->fixupsEnd(); fit != end; ++fit) {
+			if ( fit->firstInCluster() ) {
+				if ( fit->kind == ld::Fixup::kindNoneFollowOn ) {
+					if ( fit->binding == ld::Fixup::bindingDirectlyBound ) {
+						//fprintf(stderr, "switching import of %s to import of %s\n", target->name(),  fit->u.target->name());
+						target = fit->u.target;
+					}
+				}
+			}
+		}
+	}
+
+	// record dyld info for this cluster
+	if ( needsRebase ) {
+		if ( inReadOnlySeg ) {
+//			noteTextReloc(atom, target);
+			sect->hasLocalRelocs = true;  // so dyld knows to change permissions on __TEXT segment
+			rebaseType = REBASE_TYPE_TEXT_ABSOLUTE32;
+		}
+		if ( _options.sharedRegionEligible() ) {
+			// <rdar://problem/13287063> when range checking, ignore high byte of arm64 addends
+			uint64_t checkAddend = addend;
+			if ( _options.architecture() == CPU_TYPE_ARM64 )
+				checkAddend &= 0x0FFFFFFFFFFFFFFFULL;
+			if ( checkAddend != 0 ) {
+				// make sure the addend does not cause the pointer to point outside the target's segment
+				// if it does, update_dyld_shared_cache will not be able to put this dylib into the shared cache
+				uint64_t targetAddress = target->finalAddress();
+				for (std::vector<ld::Internal::FinalSection*>::iterator sit = state.sections.begin(); sit != state.sections.end(); ++sit) {
+					ld::Internal::FinalSection* sct = *sit;
+					uint64_t sctEnd = (sct->address+sct->size);
+					if ( (sct->address <= targetAddress) && (targetAddress < sctEnd) ) {
+						if ( (targetAddress+checkAddend) > sctEnd ) {
+							warning("data symbol %s from %s has pointer to %s + 0x%08llX. "
+									"That large of an addend may disable %s from being put in the dyld shared cache.",
+									atom->name(), atom->file()->path(), target->name(), addend, _options.installPath() );
+						}
+					}
+				}
+			}
+		}
+		_rebasedAtoms.insert(atom);
+	}
+//	if ( needsBinding ) {
+//		if ( inReadOnlySeg ) {
+//			noteTextReloc(atom, target);
+//			sect->hasExternalRelocs = true; // so dyld knows to change permissions on __TEXT segment
+//		}
+//		_bindingInfo.push_back(BindingInfo(type, this->compressedOrdinalForAtom(target), target->name(), weak_import, address, addend));
+//	}
+//	if ( needsLazyBinding ) {
+//		if ( _options.bindAtLoad() )
+//			_bindingInfo.push_back(BindingInfo(type, this->compressedOrdinalForAtom(target), target->name(), weak_import, address, addend));
+//		else
+//			_lazyBindingInfo.push_back(BindingInfo(type, this->compressedOrdinalForAtom(target), target->name(), weak_import, address, addend));
+//	}
+//	if ( needsWeakBinding )
+//		_weakBindingInfo.push_back(BindingInfo(type, 0, target->name(), false, address, addend));
+}
 
 bool Layout::Comparer::operator()(const ld::Atom* left, const ld::Atom* right)
 {
@@ -153,6 +665,32 @@ bool Layout::Comparer::operator()(const ld::Atom* left, const ld::Atom* right)
 			}
 			else {
 				// neither are overridden, 
+				// fall into default sorting below
+			}
+		}
+	}
+
+	if (true) {
+		auto leftPos  = _layout._rebasedAtoms.find(left);
+		auto rightPos = _layout._rebasedAtoms.find(right);
+		auto end = _layout._rebasedAtoms.end();
+		if ( leftPos != end ) {
+			if ( rightPos != end ) {
+				// both left and right are overridden
+				// fall into default sorting below
+			}
+			else {
+				// left is overridden and right is not, so left < right
+				return true;
+			}
+		}
+		else {
+			if ( rightPos != end ) {
+				// right is overridden and left is not, so right < left
+				return false;
+			}
+			else {
+				// neither are overridden,
 				// fall into default sorting below
 			}
 		}
@@ -613,6 +1151,9 @@ void Layout::doPass()
 
 	// assign new ordinal value to all ordered atoms
 	this->buildOrdinalOverrideMap();
+
+	// record all atoms which will be rebased
+	this->buildRebasedAtoms();
 
 	// sort atoms in each section
 	for (std::vector<ld::Internal::FinalSection*>::iterator sit=_state.sections.begin(); sit != _state.sections.end(); ++sit) {
