@@ -267,27 +267,9 @@ void Layout::buildRebasedAtoms()
 {
 	for (std::vector<ld::Internal::FinalSection*>::iterator sit = _state.sections.begin(); sit != _state.sections.end(); ++sit) {
 		ld::Internal::FinalSection* sect = *sit;
-		// record end of last __TEXT section encrypted iPhoneOS apps.
-		if ( _options.makeEncryptable() && (strcmp(sect->segmentName(), "__TEXT") == 0) ) {
-//			_encryptedTEXTendOffset = pageAlign(sect->fileOffset + sect->size);
-		}
-		bool objc1ClassRefSection = ( (sect->type() == ld::Section::typeCStringPointer)
-									 && (strcmp(sect->sectionName(), "__cls_refs") == 0)
-									 && (strcmp(sect->segmentName(), "__OBJC") == 0) );
+
 		for (std::vector<const ld::Atom*>::iterator ait = sect->atoms.begin(); ait != sect->atoms.end(); ++ait) {
 			const ld::Atom*		atom = *ait;
-
-			// Record regular atoms that override a dylib's weak definitions
-			if ( (atom->scope() == ld::Atom::scopeGlobal) && atom->overridesDylibsWeakDef() ) {
-				if ( _options.makeCompressedDyldInfo() ) {
-//					uint8_t wtype = BIND_TYPE_OVERRIDE_OF_WEAKDEF_IN_DYLIB;
-//					bool nonWeakDef = (atom->combine() == ld::Atom::combineNever);
-//					_weakBindingInfo.push_back(BindingInfo(wtype, atom->name(), nonWeakDef, atom->finalAddress(), 0));
-				}
-//				this->overridesWeakExternalSymbols = true;
-				if ( _options.warnWeakExports()	)
-					warning("overrides weak external symbol: %s", atom->name());
-			}
 
 			ld::Fixup*			fixupWithTarget = NULL;
 			ld::Fixup*			fixupWithMinusTarget = NULL;
@@ -356,7 +338,6 @@ void Layout::buildRebasedAtoms()
 					case ld::Fixup::kindDataInCodeStartJT32:
 					case ld::Fixup::kindDataInCodeStartJTA32:
 					case ld::Fixup::kindDataInCodeEnd:
-//						hasDataInCode = true;
 						break;
 					default:
 						break;
@@ -366,26 +347,12 @@ void Layout::buildRebasedAtoms()
 				}
 				if ( fit->lastInCluster() ) {
 					if ( (fixupWithStore != NULL) && (target != NULL) ) {
-						if ( _options.outputKind() == Options::kObjectFile ) {
-//							this->addSectionRelocs(state, sect, atom, fixupWithTarget, fixupWithMinusTarget, fixupWithAddend, fixupWithStore,
-//												   target, minusTarget, targetAddend, minusTargetAddend);
-						}
-						else {
+						if ( _options.outputKind() != Options::kObjectFile ) {
 							if ( _options.makeCompressedDyldInfo() ) {
 								this->addDyldInfo(_state, sect, atom, fixupWithTarget, fixupWithMinusTarget, fixupWithStore,
 												  target, minusTarget, targetAddend, minusTargetAddend);
 							}
-							else {
-//								this->addClassicRelocs(state, sect, atom, fixupWithTarget, fixupWithMinusTarget, fixupWithStore,
-//													   target, minusTarget, targetAddend, minusTargetAddend);
-							}
 						}
-					}
-					else if ( objc1ClassRefSection && (target != NULL) && (fixupWithStore == NULL) ) {
-						// check for class refs to lazy loaded dylibs
-						const ld::dylib::File* dylib = dynamic_cast<const ld::dylib::File*>(target->file());
-						if ( (dylib != NULL) && dylib->willBeLazyLoadedDylib() )
-							throwf("illegal class reference to %s in lazy loaded dylib %s", target->name(), dylib->path());
 					}
 				}
 			}
@@ -420,11 +387,6 @@ void Layout::addDyldInfo(ld::Internal& state,  ld::Internal::FinalSection* sect,
 					// ok to ignore pc-rel references within a weak function to itself
 					return;
 				}
-				// Have direct reference to weak-global.  This should be an indrect reference
-				const char* demangledName = strdup(_options.demangleSymbol(atom->name()));
-				warning("direct access in %s to global weak symbol %s means the weak symbol cannot be overridden at runtime. "
-						"This was likely caused by different translation units being compiled with different visibility settings.",
-						demangledName, _options.demangleSymbol(target->name()));
 			}
 			return;
 		}
@@ -449,11 +411,6 @@ void Layout::addDyldInfo(ld::Internal& state,  ld::Internal::FinalSection* sect,
 				// ok for __eh_frame and __uwind_info to use pointer diffs to global weak symbols
 				return;
 			}
-			// Have direct reference to weak-global.  This should be an indrect reference
-			const char* demangledName = strdup(_options.demangleSymbol(atom->name()));
-			warning("direct access in %s to global weak symbol %s means the weak symbol cannot be overridden at runtime. "
-					"This was likely caused by different translation units being compiled with different visibility settings.",
-				 demangledName, _options.demangleSymbol(target->name()));
 		}
 		return;
 	}
@@ -468,16 +425,8 @@ void Layout::addDyldInfo(ld::Internal& state,  ld::Internal::FinalSection* sect,
 
 	bool inReadOnlySeg = ((_options.initialSegProtection(sect->segmentName()) & VM_PROT_WRITE) == 0);
 	bool needsRebase = false;
-	bool needsBinding = false;
-	bool needsLazyBinding = false;
-	bool needsWeakBinding = false;
 
 	uint8_t	rebaseType = REBASE_TYPE_POINTER;
-	uint8_t type = BIND_TYPE_POINTER;
-	const ld::dylib::File* dylib = dynamic_cast<const ld::dylib::File*>(target->file());
-//	bool weak_import = (fixupWithTarget->weakImport || ((dylib != NULL) && dylib->forcedWeakLinked()));
-//	uint64_t address =  atom->finalAddress() + fixupWithTarget->offsetInAtom;
-	uint64_t addend = targetAddend - minusTargetAddend;
 
 	// special case lazy pointers
 	if ( fixupWithTarget->kind == ld::Fixup::kindLazyTarget ) {
@@ -486,49 +435,11 @@ void Layout::addDyldInfo(ld::Internal& state,  ld::Internal::FinalSection* sect,
 		// lazy dylib lazy pointers do not have any dyld info
 		if ( atom->section().type() == ld::Section::typeLazyDylibPointer )
 			return;
-		// lazy binding to weak definitions are done differently
-		// they are directly bound to target, then have a weak bind in case of a collision
-		if ( target->combine() == ld::Atom::combineByName ) {
-			if ( target->definition() == ld::Atom::definitionProxy ) {
-				// weak def exported from another dylib
-				// must non-lazy bind to it plus have weak binding info in case of collision
-				needsBinding = true;
-				needsWeakBinding = true;
-			}
-			else {
-				// weak def in this linkage unit.
-				// just rebase, plus have weak binding info in case of collision
-				// this will be done by other cluster on lazy pointer atom
-			}
-		}
-		else if ( target->contentType() == ld::Atom::typeResolver ) {
-			// <rdar://problem/8553647> Hidden resolver functions should not have lazy binding info
-			// <rdar://problem/12629331> Resolver function run before initializers when overriding the dyld shared cache
-			// The lazy pointers used by stubs used when non-lazy binding to a resolver are not normal lazy pointers
-			// and should not be in lazy binding info.
-			needsLazyBinding = false;
-		}
-		else {
-			// normal case of a pointer to non-weak-def symbol, so can lazily bind
-			needsLazyBinding = true;
-		}
 	}
 	else {
 		// everything except lazy pointers
 		switch ( target->definition() ) {
 			case ld::Atom::definitionProxy:
-				if ( (dylib != NULL) && dylib->willBeLazyLoadedDylib() )
-					throwf("illegal data reference to %s in lazy loaded dylib %s", target->name(), dylib->path());
-				if ( target->contentType() == ld::Atom::typeTLV ) {
-					if ( sect->type() != ld::Section::typeTLVPointers )
-						throwf("illegal data reference in %s to thread local variable %s in dylib %s",
-							   atom->name(), target->name(), dylib->path());
-				}
-				if ( inReadOnlySeg )
-					type = BIND_TYPE_TEXT_ABSOLUTE32;
-				needsBinding = true;
-				if ( target->combine() == ld::Atom::combineByName )
-					needsWeakBinding = true;
 				break;
 			case ld::Atom::definitionRegular:
 			case ld::Atom::definitionTentative:
@@ -539,14 +450,10 @@ void Layout::addDyldInfo(ld::Internal& state,  ld::Internal::FinalSection* sect,
 				// references to internal symbol never need binding
 				if ( target->scope() != ld::Atom::scopeGlobal )
 					break;
-				// reference to global weak def needs weak binding
-				if ( (target->combine() == ld::Atom::combineByName) && (target->definition() == ld::Atom::definitionRegular) )
-					needsWeakBinding = true;
 				else if ( _options.outputKind() == Options::kDynamicExecutable ) {
 					// in main executables, the only way regular symbols are indirected is if -interposable is used
 					if ( _options.interposable(target->name()) ) {
 						needsRebase = false;
-						needsBinding = true;
 					}
 				}
 				else {
@@ -558,10 +465,6 @@ void Layout::addDyldInfo(ld::Internal& state,  ld::Internal::FinalSection* sect,
 							break;
 						// no rebase info for references to global symbols that will have binding info
 						needsRebase = false;
-						needsBinding = true;
-					}
-					else if ( _options.forceCoalesce(target->name()) ) {
-						needsWeakBinding = true;
 					}
 				}
 				break;
@@ -576,7 +479,6 @@ void Layout::addDyldInfo(ld::Internal& state,  ld::Internal::FinalSection* sect,
 			if ( fit->firstInCluster() ) {
 				if ( fit->kind == ld::Fixup::kindNoneFollowOn ) {
 					if ( fit->binding == ld::Fixup::bindingDirectlyBound ) {
-						//fprintf(stderr, "switching import of %s to import of %s\n", target->name(),  fit->u.target->name());
 						target = fit->u.target;
 					}
 				}
@@ -587,49 +489,10 @@ void Layout::addDyldInfo(ld::Internal& state,  ld::Internal::FinalSection* sect,
 	// record dyld info for this cluster
 	if ( needsRebase ) {
 		if ( inReadOnlySeg ) {
-//			noteTextReloc(atom, target);
-			sect->hasLocalRelocs = true;  // so dyld knows to change permissions on __TEXT segment
 			rebaseType = REBASE_TYPE_TEXT_ABSOLUTE32;
-		}
-		if ( _options.sharedRegionEligible() ) {
-			// <rdar://problem/13287063> when range checking, ignore high byte of arm64 addends
-			uint64_t checkAddend = addend;
-			if ( _options.architecture() == CPU_TYPE_ARM64 )
-				checkAddend &= 0x0FFFFFFFFFFFFFFFULL;
-			if ( checkAddend != 0 ) {
-				// make sure the addend does not cause the pointer to point outside the target's segment
-				// if it does, update_dyld_shared_cache will not be able to put this dylib into the shared cache
-				uint64_t targetAddress = target->finalAddress();
-				for (std::vector<ld::Internal::FinalSection*>::iterator sit = state.sections.begin(); sit != state.sections.end(); ++sit) {
-					ld::Internal::FinalSection* sct = *sit;
-					uint64_t sctEnd = (sct->address+sct->size);
-					if ( (sct->address <= targetAddress) && (targetAddress < sctEnd) ) {
-						if ( (targetAddress+checkAddend) > sctEnd ) {
-							warning("data symbol %s from %s has pointer to %s + 0x%08llX. "
-									"That large of an addend may disable %s from being put in the dyld shared cache.",
-									atom->name(), atom->file()->path(), target->name(), addend, _options.installPath() );
-						}
-					}
-				}
-			}
 		}
 		_rebasedAtoms.insert(atom);
 	}
-//	if ( needsBinding ) {
-//		if ( inReadOnlySeg ) {
-//			noteTextReloc(atom, target);
-//			sect->hasExternalRelocs = true; // so dyld knows to change permissions on __TEXT segment
-//		}
-//		_bindingInfo.push_back(BindingInfo(type, this->compressedOrdinalForAtom(target), target->name(), weak_import, address, addend));
-//	}
-//	if ( needsLazyBinding ) {
-//		if ( _options.bindAtLoad() )
-//			_bindingInfo.push_back(BindingInfo(type, this->compressedOrdinalForAtom(target), target->name(), weak_import, address, addend));
-//		else
-//			_lazyBindingInfo.push_back(BindingInfo(type, this->compressedOrdinalForAtom(target), target->name(), weak_import, address, addend));
-//	}
-//	if ( needsWeakBinding )
-//		_weakBindingInfo.push_back(BindingInfo(type, 0, target->name(), false, address, addend));
 }
 
 bool Layout::Comparer::operator()(const ld::Atom* left, const ld::Atom* right)
