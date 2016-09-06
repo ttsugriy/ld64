@@ -430,7 +430,6 @@ void Layout::noteRebaseInfo(ld::Internal& state,  ld::Internal::FinalSection* se
 	// special case lazy pointers
 	if ( fixupWithTarget->kind == ld::Fixup::kindLazyTarget ) {
 		assert(fixupWithTarget->u.target == target);
-		assert(addend == 0);
 		// lazy dylib lazy pointers do not have any dyld info
 		if ( atom->section().type() == ld::Section::typeLazyDylibPointer )
 			return;
