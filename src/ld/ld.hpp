@@ -692,7 +692,8 @@ public:
 													_scope(s), _mode(modeSectionOffset), 
 													_overridesADylibsWeakDef(false), _coalescedAway(false),
 													_live(false), _dontDeadStripIfRefLive(false),
-													_machoSection(0), _weakImportState(weakImportUnset)
+													_machoSection(0), _weakImportState(weakImportUnset),
+													_lazyRebase(true)
 													 {
 													#ifndef NDEBUG
 														switch ( _combine ) {
@@ -789,6 +790,11 @@ public:
 													_weakImportState = a._weakImportState;
 												}
 
+	bool									isRebaseLazily() const		{ return _lazyRebase; }
+	bool									isRebaseEagerly() const		{ return !_lazyRebase; }
+	void									rebaseLazily()				{ _lazyRebase = true; }
+	void									rebaseEagerly()				{ _lazyRebase = false; }
+
 protected:
 	enum AddressMode { modeSectionOffset, modeFinalAddress };
 
@@ -812,6 +818,7 @@ protected:
 	bool								_dontDeadStripIfRefLive : 1;
 	unsigned							_machoSection : 8;
 	WeakImportState						_weakImportState : 2;
+	bool								_lazyRebase : 1;
 };
 
 

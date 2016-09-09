@@ -91,18 +91,15 @@ public:
 	ld::Internal::FinalSection*	indirectSymbolTableSection;
 	
 	struct RebaseInfo {
-						RebaseInfo(uint8_t t, uint64_t addr, bool eager) : _type(t), _address(addr), _eager(eager) {}
+						RebaseInfo(uint8_t t, uint64_t addr) : _type(t), _address(addr) {}
 		uint8_t			_type;
 		uint64_t		_address;
-		bool			_eager;
 		// for sorting
 		int operator<(const RebaseInfo& rhs) const {
 			// sort by type, then address
 			if ( this->_type != rhs._type )
 				return  (this->_type < rhs._type );
-			if ( this->_address != rhs._address )
-				return  (this->_address < rhs._address );
-			return  (this->_eager < rhs._eager);
+			return  (this->_address < rhs._address );
 		}
 	};
 
@@ -305,7 +302,7 @@ public:
 	uint32_t								_importSymbolsCount;
 	std::map<const ld::Atom*, uint32_t>		_atomToSymbolIndex;
 	std::vector<RebaseInfo>					_rebaseInfo;
-	std::set<const ld::Atom*>				_eagerAtoms;
+	std::vector<RebaseInfo>					_lazyRebaseInfo;
 	std::vector<BindingInfo>				_bindingInfo;
 	std::vector<BindingInfo>				_lazyBindingInfo;
 	std::vector<BindingInfo>				_weakBindingInfo;

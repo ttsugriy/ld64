@@ -355,6 +355,7 @@ public:
 	bool						readOnlyx86Stubs() { return fReadOnlyx86Stubs; }
 	const std::vector<DylibOverride>&	dylibOverrides() const { return fDylibOverrides; }
 	const char*					generatedMapPath() const { return fMapPath; }
+	const char*					dynamicRebaseInfoPath() const { return fDynamicRebaseInfoPath; }
 	bool						positionIndependentExecutable() const { return fPositionIndependentExecutable; }
 	Options::FileInfo			findFileUsingPaths(const std::string &path) const;
 	bool						deadStripDylibs() const { return fDeadStripDylibs; }
@@ -610,6 +611,7 @@ private:
 	const char*							fDtraceScriptName;
 	const char*							fSegAddrTablePath;
 	const char*							fMapPath;
+	const char*							fDynamicRebaseInfoPath;
 	const char*							fDyldInstallPath;
 	const char*							fTempLtoObjectPath;
 	const char*							fOverridePathlibLTO;

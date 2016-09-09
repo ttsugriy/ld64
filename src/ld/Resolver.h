@@ -84,6 +84,7 @@ private:
 	void					buildAtomList();
 	void					addInitialUndefines();
 	void					deadStripOptimize(bool force=false);
+	void					resolveEagerRebaseAtoms();
 	void					resolveUndefines();
 	void					checkUndefines(bool force=false);
 	void					checkDylibSymbolCollisions();
@@ -97,6 +98,8 @@ private:
 	void					convertReferencesToIndirect(const ld::Atom& atom);
 	const ld::Atom*			entryPoint(bool searchArchives);
 	void					markLive(const ld::Atom& atom, WhyLiveBackChain* previous);
+	template <bool (*V)(const Atom*), void (*M)(Atom*)>
+	void					visit(const ld::Atom& atom, WhyLiveBackChain* previous);
 	bool					isDtraceProbe(ld::Fixup::Kind kind);
 	void					liveUndefines(std::vector<const char*>&);
 	void					remainingUndefines(std::vector<const char*>&);
@@ -127,6 +130,7 @@ private:
 	std::vector<const ld::Atom*>	_atoms;
 	std::set<const ld::Atom*>		_deadStripRoots;
 	std::vector<const ld::Atom*>	_dontDeadStripIfReferencesLive;
+	std::set<const ld::Atom*>		_eagerRebaseRoots;
 	std::vector<const ld::Atom*>	_atomsWithUnresolvedReferences;
 	std::vector<const class AliasAtom*>	_aliasesFromCmdLine;
 	SymbolTable						_symbolTable;

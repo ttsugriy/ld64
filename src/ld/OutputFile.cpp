@@ -42,6 +42,7 @@
 #include <dlfcn.h>
 #include <mach-o/dyld.h>
 #include <mach-o/fat.h>
+#include <unistd.h>
 
 #include <string>
 #include <map>
@@ -3766,126 +3767,15 @@ uint64_t OutputFile::lookBackAddend(ld::Fixup::iterator fit)
 }
 
 
-class Closure {
-private:
-	std::set<const ld::Atom*> _roots;
-	const Internal &_state;
-	SymbolTable						_symbolTable;
-	bool _built;
-	std::set<const ld::Atom*> _closure;
-
-	void visit(const Atom* atom) {
-		// if already marked live, then done (stop recursion)
-		if ( _closure.find(atom) != _closure.cend() )
-			return;
-
-		// mark this atom is live
-		_closure.insert(atom);
-
-		// mark all atoms it references as live
-		for (auto fit = atom->fixupsBegin(), end=atom->fixupsEnd(); fit != end; ++fit) {
-			const ld::Atom* target;
-			switch ( fit->kind ) {
-				case ld::Fixup::kindNone:
-				case ld::Fixup::kindNoneFollowOn:
-				case ld::Fixup::kindNoneGroupSubordinate:
-				case ld::Fixup::kindNoneGroupSubordinateFDE:
-				case ld::Fixup::kindNoneGroupSubordinateLSDA:
-				case ld::Fixup::kindNoneGroupSubordinatePersonality:
-				case ld::Fixup::kindSetTargetAddress:
-				case ld::Fixup::kindSubtractTargetAddress:
-				case ld::Fixup::kindStoreTargetAddressLittleEndian32:
-				case ld::Fixup::kindStoreTargetAddressLittleEndian64:
-				case ld::Fixup::kindStoreTargetAddressBigEndian32:
-				case ld::Fixup::kindStoreTargetAddressBigEndian64:
-				case ld::Fixup::kindStoreTargetAddressX86PCRel32:
-				case ld::Fixup::kindStoreTargetAddressX86BranchPCRel32:
-				case ld::Fixup::kindStoreTargetAddressX86PCRel32GOTLoad:
-				case ld::Fixup::kindStoreTargetAddressX86PCRel32GOTLoadNowLEA:
-				case ld::Fixup::kindStoreTargetAddressX86PCRel32TLVLoad:
-				case ld::Fixup::kindStoreTargetAddressX86PCRel32TLVLoadNowLEA:
-				case ld::Fixup::kindStoreTargetAddressX86Abs32TLVLoad:
-				case ld::Fixup::kindStoreTargetAddressX86Abs32TLVLoadNowLEA:
-				case ld::Fixup::kindStoreTargetAddressARMBranch24:
-				case ld::Fixup::kindStoreTargetAddressThumbBranch22:
-#if SUPPORT_ARCH_arm64
-				case ld::Fixup::kindStoreTargetAddressARM64Branch26:
-				case ld::Fixup::kindStoreTargetAddressARM64Page21:
-				case ld::Fixup::kindStoreTargetAddressARM64GOTLoadPage21:
-				case ld::Fixup::kindStoreTargetAddressARM64GOTLeaPage21:
-				case ld::Fixup::kindStoreTargetAddressARM64TLVPLoadPage21:
-				case ld::Fixup::kindStoreTargetAddressARM64TLVPLoadNowLeaPage21:
-#endif
-					switch ( fit->binding ) {
-						case ld::Fixup::bindingDirectlyBound:
-							visit(fit->u.target);
-							break;
-						case ld::Fixup::bindingByNameUnbound:
-							// doAtom() did not convert to indirect in dead-strip mode, so that now
-							fit->u.bindingIndex = _symbolTable.findSlotForName(fit->u.name);
-							fit->binding = ld::Fixup::bindingsIndirectlyBound;
-							// fall into next case
-						case ld::Fixup::bindingsIndirectlyBound:
-							target = _state.indirectBindingTable[fit->u.bindingIndex];
-							if ( target == NULL ) {
-								target = _state.indirectBindingTable[fit->u.bindingIndex];
-							}
-							if ( target != NULL ) {
-								if ( target->definition() == ld::Atom::definitionTentative ) {
-									target = _state.indirectBindingTable[fit->u.bindingIndex];
-								}
-								this->visit(target);
-							}
-							break;
-						default:
-							assert(0 && "bad binding during dead stripping");
-					}
-					break;
-				default:
-					break;
-			}
-		}
-
-	}
-public:
-	Closure(Internal &state, const Options& opts): _state(state), _symbolTable(opts, state.indirectBindingTable), _built(false) {}
-
-	void addRoot(const Atom *root) {
-		const auto &result = _roots.insert(root);
-		if (result.second) {
-			_built = false;
-		}
-	}
-
-	void build() {
-		if (_built) {
-			return;
-		}
-		for (const auto &root : _roots) {
-			visit(root);
-		}
-	}
-
-	std::set<const ld::Atom*> &get() {
-		return _closure;
-	}
+struct DynamicReaseInfoFileHeader {
+	uint64_t magic; // file magic number
+	uint64_t version; // version number
+	size_t count; // number of rebase info entries
 };
 
 
 void OutputFile::generateLinkEditInfo(ld::Internal& state)
 {
-	Closure closure(state, _options);
-	// add initializers as roots
-	for (auto sit : state.sections) {
-		if (sit->type() == Section::typeInitializerPointers) {
-			for (const auto& atom : sit->atoms) {
-				closure.addRoot(atom);
-			}
-		}
-	}
-	closure.build();
-	_eagerAtoms = std::move(closure.get());
-
 	for (std::vector<ld::Internal::FinalSection*>::iterator sit = state.sections.begin(); sit != state.sections.end(); ++sit) {
 		ld::Internal::FinalSection* sect = *sit;
 		// record end of last __TEXT section encrypted iPhoneOS apps.
@@ -4011,6 +3901,24 @@ void OutputFile::generateLinkEditInfo(ld::Internal& state)
 				}
 			}
 		}
+	}
+
+	if ( _options.dynamicRebaseInfoPath() != nullptr ) {
+		assert(_options.dynamicRebaseInfoPath() && "Dynamic rebase info path is absent");
+		printf("%s\n",_options.dynamicRebaseInfoPath());
+		int fd = open(_options.dynamicRebaseInfoPath(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+		if (fd == -1) {
+			throw "could not open dynamic rebase info file";
+		}
+		DynamicReaseInfoFileHeader header;
+		header.magic = 0xfb;
+		header.version = 1;
+		header.count = _lazyRebaseInfo.size();
+
+		::write(fd, &header, sizeof(header));
+		::write(fd, _lazyRebaseInfo.data(), _lazyRebaseInfo.size() * sizeof(RebaseInfo));
+
+		close(fd);
 	}
 }
 
@@ -4272,8 +4180,12 @@ void OutputFile::addDyldInfo(ld::Internal& state,  ld::Internal::FinalSection* s
 				}
 			}
 		}
-		bool eager = _eagerAtoms.find(atom) != _eagerAtoms.cend();
-		_rebaseInfo.push_back(RebaseInfo(rebaseType, address, eager));
+		if (atom->isRebaseEagerly())  {
+			_rebaseInfo.push_back(RebaseInfo(rebaseType, address));
+		} else {
+			printf("Atom is from %s\n", atom->file()->path());
+			_lazyRebaseInfo.push_back(RebaseInfo(rebaseType, address));
+		}
 	}
 	if ( needsBinding ) {
 		if ( inReadOnlySeg ) {

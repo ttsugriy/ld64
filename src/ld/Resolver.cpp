@@ -765,6 +765,12 @@ void Resolver::doAtom(const ld::Atom& atom)
 			}
 		}
 	}
+
+	if ( _options.dynamicRebaseInfoPath() != nullptr) {
+		if (atom.section().type() == Section::typeInitializerPointers ) {
+			_eagerRebaseRoots.insert(&atom);
+		}
+	}
 }
 
 bool Resolver::isDtraceProbe(ld::Fixup::Kind kind)
@@ -956,9 +962,10 @@ void Resolver::resolveUndefines()
 }
 
 
-void Resolver::markLive(const ld::Atom& atom, WhyLiveBackChain* previous)
+template <bool (*V)(const Atom*), void (*M)(Atom*)>
+void Resolver::visit(const ld::Atom& atom, WhyLiveBackChain* previous)
 {
-	//fprintf(stderr, "markLive(%p) %s\n", &atom, atom.name());
+	//fprintf(stderr, "visit(%p) %s\n", &atom, atom.name());
 	// if -why_live cares about this symbol, then dump chain
 	if ( (previous->referer != NULL) && _options.printWhyLive(atom.name()) ) {
 		fprintf(stderr, "%s from %s\n", atom.name(), atom.file()->path());
@@ -970,14 +977,14 @@ void Resolver::markLive(const ld::Atom& atom, WhyLiveBackChain* previous)
 		}
 	}
 	
-	// if already marked live, then done (stop recursion)
-	if ( atom.live() )
+	// if already visited, then done (stop recursion)
+	if ( V(&atom) )
 		return;
-		
-	// mark this atom is live
-	(const_cast<ld::Atom*>(&atom))->setLive();
 	
-	// mark all atoms it references as live
+	// mark this atom visited
+	M((const_cast<ld::Atom*>(&atom)));
+
+	// mark all atoms it references as visited
 	WhyLiveBackChain thisChain;
 	thisChain.previous = previous;
 	thisChain.referer = &atom;
@@ -1038,7 +1045,7 @@ void Resolver::markLive(const ld::Atom& atom, WhyLiveBackChain* previous)
 				}
 				switch ( fit->binding ) {
 					case ld::Fixup::bindingDirectlyBound:
-						markLive(*(fit->u.target), &thisChain);
+						visit<V, M>(*(fit->u.target), &thisChain);
 						break;
 					case ld::Fixup::bindingByNameUnbound:
 						// doAtom() did not convert to indirect in dead-strip mode, so that now
@@ -1054,13 +1061,13 @@ void Resolver::markLive(const ld::Atom& atom, WhyLiveBackChain* previous)
 						}
 						if ( target != NULL ) {
 							if ( target->definition() == ld::Atom::definitionTentative ) {
-								// <rdar://problem/5894163> need to search archives for overrides of common symbols 
+								// <rdar://problem/5894163> need to search archives for overrides of common symbols
 								bool searchDylibs = (_options.commonsMode() == Options::kCommonsOverriddenByDylibs);
 								_inputFiles.searchLibraries(target->name(), searchDylibs, true, true, *this);
 								// recompute target since it may have been overridden by searchLibraries()
 								target = _internal.indirectBindingTable[fit->u.bindingIndex];
 							}
-							this->markLive(*target, &thisChain);
+							this->visit<V, M>(*target, &thisChain);
 						}
 						else {
 							_atomsWithUnresolvedReferences.push_back(&atom);
@@ -1070,11 +1077,33 @@ void Resolver::markLive(const ld::Atom& atom, WhyLiveBackChain* previous)
 						assert(0 && "bad binding during dead stripping");
 				}
 				break;
-            default:
-                break;    
+			default:
+				break;
 		}
 	}
 
+}
+
+static bool isEagerRebase(const Atom* atom) {
+	return atom->isRebaseEagerly();
+}
+
+static void markAsEagerRebase(Atom* atom) {
+	atom->rebaseEagerly();
+}
+
+static bool isLive(const Atom* atom) {
+	return atom->live();
+}
+
+static void markAsLive(Atom* atom) {
+	atom->setLive();
+}
+
+
+inline void Resolver::markLive(const ld::Atom& atom, WhyLiveBackChain* previous)
+{
+	visit<isLive, markAsLive>(atom, previous);
 }
 
 class NotLiveLTO {
@@ -1092,6 +1121,19 @@ public:
 		}
 	}
 };
+
+void Resolver::resolveEagerRebaseAtoms()
+{
+	if ( _options.dynamicRebaseInfoPath() == nullptr )
+		return;
+
+	for (const auto root : _eagerRebaseRoots) {
+		WhyLiveBackChain rootChain;
+		rootChain.previous = NULL;
+		rootChain.referer = root;
+		this->visit<isEagerRebase, markAsEagerRebase>(*root, &rootChain);
+	}
+}
 
 void Resolver::deadStripOptimize(bool force)
 {
@@ -1142,7 +1184,7 @@ void Resolver::deadStripOptimize(bool force)
 		WhyLiveBackChain rootChain;
 		rootChain.previous = NULL;
 		rootChain.referer = *it;
-		this->markLive(**it, &rootChain);
+		this->visit<isLive, markAsLive>(**it, &rootChain);
 	}
 	
 	// special case atoms that need to be live if they reference something live
@@ -1852,6 +1894,7 @@ void Resolver::resolve()
 	this->linkTimeOptimize();
 	this->fillInInternalState();
 	this->tweakWeakness();
+	this->resolveEagerRebaseAtoms();
     _symbolTable.checkDuplicateSymbols();
 }
 

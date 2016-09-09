@@ -3217,6 +3217,11 @@ void Options::parse(int argc, const char* argv[])
 				if ( fMapPath == NULL )
 					throw "missing argument to -map";
 			}
+			else if ( strcmp(arg, "-dynamic_rebase_info") == 0 ) {
+				fDynamicRebaseInfoPath = argv[++i];
+				if ( fDynamicRebaseInfoPath == NULL )
+					throw "missing argument to -dynamic_rebase_info";
+			}
 			else if ( strcmp(arg, "-pie") == 0 ) {
 				fPositionIndependentExecutable = true;
 				fPIEOnCommandLine = true;
