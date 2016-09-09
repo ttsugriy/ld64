@@ -3905,7 +3905,6 @@ void OutputFile::generateLinkEditInfo(ld::Internal& state)
 
 	if ( _options.dynamicRebaseInfoPath() != nullptr ) {
 		assert(_options.dynamicRebaseInfoPath() && "Dynamic rebase info path is absent");
-		printf("%s\n",_options.dynamicRebaseInfoPath());
 		int fd = open(_options.dynamicRebaseInfoPath(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
 		if (fd == -1) {
 			throw "could not open dynamic rebase info file";
