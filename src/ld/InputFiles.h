@@ -78,11 +78,11 @@ public:
 	void						createIndirectDylibs();
 
 	// for -print_statistics
-	volatile int64_t			_totalObjectSize;
-	volatile int64_t			_totalArchiveSize;
-	volatile int32_t			_totalObjectLoaded;
-	volatile int32_t			_totalArchivesLoaded;
-	volatile int32_t			_totalDylibsLoaded;
+	std::atomic<int64_t>		_totalObjectSize;
+	std::atomic<int64_t>		_totalArchiveSize;
+	std::atomic<int32_t>		_totalObjectLoaded;
+	std::atomic<int32_t>		_totalArchivesLoaded;
+	std::atomic<int32_t>		_totalDylibsLoaded;
 	
 	
 private:

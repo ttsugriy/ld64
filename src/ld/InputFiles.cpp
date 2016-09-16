@@ -307,16 +307,16 @@ ld::File* InputFiles::makeFile(const Options::FileInfo& info, bool indirectDylib
 
 	ld::relocatable::File* objResult = mach_o::relocatable::parse(p, len, info.path, info.modTime, info.ordinal, objOpts);
 	if ( objResult != NULL ) {
-		OSAtomicAdd64(len, &_totalObjectSize);
-		OSAtomicIncrement32(&_totalObjectLoaded);
+		_totalObjectSize.fetch_add(len);
+		_totalObjectLoaded.fetch_add(1);
 		return objResult;
 	}
 
 	// see if it is an llvm object file
 	objResult = lto::parse(p, len, info.path, info.modTime, info.ordinal, _options.architecture(), _options.subArchitecture(), _options.logAllFiles(), _options.verboseOptimizationHints());
 	if ( objResult != NULL ) {
-		OSAtomicAdd64(len, &_totalObjectSize);
-		OSAtomicIncrement32(&_totalObjectLoaded);
+		_totalObjectSize.fetch_add(len);
+		_totalObjectLoaded.fetch_add(1);
 		return objResult;
 	}
 
@@ -365,8 +365,8 @@ ld::File* InputFiles::makeFile(const Options::FileInfo& info, bool indirectDylib
 
 	ld::archive::File* archiveResult = ::archive::parse(p, len, info.path, info.modTime, info.ordinal, archOpts);
 	if ( archiveResult != NULL ) {
-		OSAtomicAdd64(len, &_totalArchiveSize);
-		OSAtomicIncrement32(&_totalArchivesLoaded);
+		_totalArchiveSize.fetch_add(len);
+		_totalArchivesLoaded.fetch_add(1);
 		return archiveResult;
 	}
 	

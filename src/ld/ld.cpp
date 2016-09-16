@@ -1258,9 +1258,9 @@ int main(int argc, const char* argv[])
 								statistics.vmEnd.pageouts-statistics.vmStart.pageouts, 
 								statistics.vmEnd.faults-statistics.vmStart.faults);
 			char temp[40];
-			fprintf(stderr, "processed %3u object files,  totaling %15s bytes\n", inputFiles._totalObjectLoaded, commatize(inputFiles._totalObjectSize, temp));
-			fprintf(stderr, "processed %3u archive files, totaling %15s bytes\n", inputFiles._totalArchivesLoaded, commatize(inputFiles._totalArchiveSize, temp));
-			fprintf(stderr, "processed %3u dylib files\n", inputFiles._totalDylibsLoaded);
+			fprintf(stderr, "processed %3u object files,  totaling %15s bytes\n", inputFiles._totalObjectLoaded.load(), commatize(inputFiles._totalObjectSize, temp));
+			fprintf(stderr, "processed %3u archive files, totaling %15s bytes\n", inputFiles._totalArchivesLoaded.load(), commatize(inputFiles._totalArchiveSize, temp));
+			fprintf(stderr, "processed %3u dylib files\n", inputFiles._totalDylibsLoaded.load());
 			fprintf(stderr, "wrote output file            totaling %15s bytes\n", commatize(out.fileSize(), temp));
 		}
 		// <rdar://problem/6780050> Would like linker warning to be build error.
