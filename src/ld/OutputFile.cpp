@@ -66,7 +66,6 @@
 #include "HeaderAndLoadCommands.hpp"
 #include "LinkEdit.hpp"
 #include "LinkEditClassic.hpp"
-#include "SymbolTable.h"
 
 namespace ld {
 namespace tool {
@@ -114,6 +113,7 @@ OutputFile::OutputFile(const Options& opts)
 		_symbolTableAtom(NULL),
 		_indirectSymbolTableAtom(NULL),
 		_rebasingInfoAtom(NULL),
+		_lazyRebasingInfoAtom(NULL),
 		_bindingInfoAtom(NULL),
 		_lazyBindingInfoAtom(NULL),
 		_weakBindingInfoAtom(NULL),
@@ -229,6 +229,9 @@ void OutputFile::updateLINKEDITAddresses(ld::Internal& state)
 		assert(_rebasingInfoAtom != NULL);
 		_rebasingInfoAtom->encode();
 		
+		assert(_lazyRebasingInfoAtom != NULL);
+		_lazyRebasingInfoAtom->encode();
+
 		// build dyld binding info  
 		assert(_bindingInfoAtom != NULL);
 		_bindingInfoAtom->encode();
@@ -3224,6 +3227,9 @@ void OutputFile::addLinkEdit(ld::Internal& state)
 				_rebasingInfoAtom = new RebaseInfoAtom<x86_64>(_options, state, *this);
 				rebaseSection = state.addAtom(*_rebasingInfoAtom);
 				
+				_lazyRebasingInfoAtom = new LazyRebaseInfoAtom<x86_64>(_options, state, *this);
+				lazyRebaseSection = state.addAtom(*_lazyRebasingInfoAtom);
+
 				_bindingInfoAtom = new BindingInfoAtom<x86_64>(_options, state, *this);
 				bindingSection = state.addAtom(*_bindingInfoAtom);
 				
@@ -3917,7 +3923,7 @@ void OutputFile::generateLinkEditInfo(ld::Internal& state)
 		::write(fd, &header, sizeof(header));
 		::write(fd, _lazyRebaseInfo.data(), _lazyRebaseInfo.size() * sizeof(RebaseInfo));
 
-		close(fd);
+		::close(fd);
 	}
 }
 
@@ -4179,11 +4185,14 @@ void OutputFile::addDyldInfo(ld::Internal& state,  ld::Internal::FinalSection* s
 				}
 			}
 		}
+		const bool log = false;
+		if (log) {
+			printf("To rebase lazily(%d): %s, at @%p\n", atom->isRebaseLazily(), atom->name(), atom);
+		}
 		if (atom->isRebaseEagerly())  {
-			_rebaseInfo.push_back(RebaseInfo(rebaseType, address));
+			_rebaseInfo.emplace_back(rebaseType, address);
 		} else {
-			printf("Atom is from %s\n", atom->file()->path());
-			_lazyRebaseInfo.push_back(RebaseInfo(rebaseType, address));
+			_lazyRebaseInfo.emplace_back(rebaseType, address);
 		}
 	}
 	if ( needsBinding ) {

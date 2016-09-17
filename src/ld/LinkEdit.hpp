@@ -373,6 +373,70 @@ void RebaseInfoAtom<A>::encode() const
 	if (log) fprintf(stderr, "total rebase info size = %ld\n", this->_encodedData.size());
 }
 
+template <typename A>
+class LazyRebaseInfoAtom : public LinkEditAtom
+{
+public:
+	LazyRebaseInfoAtom(const Options& opts, ld::Internal& state, OutputFile& writer)
+	: LinkEditAtom(opts, state, writer, _s_section, sizeof(pint_t)) { _encoded = true; }
+
+	// overrides of ld::Atom
+	virtual const char*							name() const override	{ return "lazy rebase info"; }
+	// overrides of LinkEditAtom
+	virtual void								encode() const override;
+
+	virtual uint64_t							size() const override;
+	virtual void								copyRawContent(uint8_t buffer[]) const override;
+
+private:
+	struct rebase_tmp
+	{
+		rebase_tmp(uint8_t op, uint64_t p1, uint64_t p2=0) : opcode(op), operand1(p1), operand2(p2) {}
+		uint8_t		opcode;
+		uint64_t	operand1;
+		uint64_t	operand2;
+	};
+
+	typedef typename A::P						P;
+	typedef typename A::P::E					E;
+	typedef typename A::P::uint_t				pint_t;
+
+	static ld::Section			_s_section;
+};
+
+template <typename A>
+ld::Section LazyRebaseInfoAtom<A>::_s_section("__LINKEDIT", "__lazy_rebase", ld::Section::typeLinkEdit, false);
+
+
+template <typename A>
+void LazyRebaseInfoAtom<A>::encode() const
+{
+	// omit relocs if this was supposed to be PIE but PIE not possible
+	if ( _options.positionIndependentExecutable() && this->_writer.pieDisabled )
+		return;
+
+	// sort rebase info by type, then address
+	std::vector<OutputFile::RebaseInfo>& info = this->_writer._lazyRebaseInfo;
+	std::sort(info.begin(), info.end());
+
+	fprintf(stderr, "Will write %lu lazy rebase things. Size: %llu\n", info.size(), this->size());
+
+	this->_encoded = true;
+}
+
+template <typename A>
+uint64_t LazyRebaseInfoAtom<A>::size() const
+{
+	assert(_encoded);
+	return this->_writer._lazyRebaseInfo.size() * sizeof(OutputFile::RebaseInfo);
+}
+
+template <typename A>
+void LazyRebaseInfoAtom<A>::copyRawContent(uint8_t buffer[]) const
+{
+	assert(_encoded);
+	memcpy(buffer, this->_writer._lazyRebaseInfo.data(), this->size());
+}
 
 template <typename A>
 class BindingInfoAtom : public LinkEditAtom

@@ -75,6 +75,7 @@ public:
 	bool						hasDataInCode;
 	ld::Internal::FinalSection*	headerAndLoadCommandsSection;
 	ld::Internal::FinalSection*	rebaseSection;
+	ld::Internal::FinalSection*	lazyRebaseSection;
 	ld::Internal::FinalSection*	bindingSection;
 	ld::Internal::FinalSection*	weakBindingSection;
 	ld::Internal::FinalSection*	lazyBindingSection;
@@ -316,6 +317,7 @@ public:
 	class ClassicLinkEditAtom*				_indirectSymbolTableAtom;
 	class StringPoolAtom*					_stringPoolAtom;
 	class LinkEditAtom*						_rebasingInfoAtom;
+	class LinkEditAtom*						_lazyRebasingInfoAtom;
 	class LinkEditAtom*						_bindingInfoAtom;
 	class LinkEditAtom*						_lazyBindingInfoAtom;
 	class LinkEditAtom*						_weakBindingInfoAtom;
