@@ -411,6 +411,8 @@ ld::Section LazyRebaseInfoAtom<A>::_s_section("__LINKEDIT", "__lazy_rebase", ld:
 template <typename A>
 void LazyRebaseInfoAtom<A>::encode() const
 {
+	const bool log = false;
+	
 	// omit relocs if this was supposed to be PIE but PIE not possible
 	if ( _options.positionIndependentExecutable() && this->_writer.pieDisabled )
 		return;
@@ -418,8 +420,10 @@ void LazyRebaseInfoAtom<A>::encode() const
 	// sort rebase info by type, then address
 	std::vector<OutputFile::RebaseInfo>& info = this->_writer._lazyRebaseInfo;
 	std::sort(info.begin(), info.end());
-
-	fprintf(stderr, "Will write %lu lazy rebase things. Size: %llu\n", info.size(), this->size());
+	
+	if (log) {
+		fprintf(stderr, "Encoded %lu lazy rebase info entries\n", info.size());
+	}
 
 	this->_encoded = true;
 }
