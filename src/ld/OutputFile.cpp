@@ -4189,7 +4189,7 @@ void OutputFile::addDyldInfo(ld::Internal& state,  ld::Internal::FinalSection* s
 		if (log) {
 			printf("To rebase lazily(%d): %s, at @%p\n", atom->isRebaseLazily(), atom->name(), atom);
 		}
-		if (atom->isRebaseEagerly())  {
+		if (atom->isRebaseEagerly() || _options.dynamicRebaseInfoPath() == nullptr)  {
 			_rebaseInfo.emplace_back(rebaseType, address);
 		} else {
 			_lazyRebaseInfo.emplace_back(rebaseType, address);
