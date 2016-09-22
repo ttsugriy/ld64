@@ -260,6 +260,7 @@ public:
 	virtual void							setScope(Scope)					{ }
 	virtual ld::Fixup::iterator				fixupsBegin() const				{ return (ld::Fixup*)&_fixup1; }
 	virtual ld::Fixup::iterator				fixupsEnd()	const 				{ return &((ld::Fixup*)&_fixup2)[1]; }
+	virtual bool							isRebaseLazily() const			{ return ld::Atom::isRebaseLazily() && _stubTo.isRebaseLazily();  }
 
 private:
 	static ld::Section& selectSection(bool close, bool stubToGlobalWeakDef, bool stubToResolver, bool usingDataConst) {

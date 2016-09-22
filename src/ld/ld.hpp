@@ -790,8 +790,8 @@ public:
 													_weakImportState = a._weakImportState;
 												}
 
-	bool									isRebaseLazily() const		{ return _lazyRebase; }
-	bool									isRebaseEagerly() const		{ return !_lazyRebase; }
+	virtual bool							isRebaseLazily() const		{ return _lazyRebase; }
+	bool									isRebaseEagerly() const		{ return !isRebaseLazily(); }
 	void									rebaseLazily()				{ _lazyRebase = true; }
 	void									rebaseEagerly()				{ _lazyRebase = false; }
 
