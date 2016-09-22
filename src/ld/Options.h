@@ -356,6 +356,7 @@ public:
 	const std::vector<DylibOverride>&	dylibOverrides() const { return fDylibOverrides; }
 	const char*					generatedMapPath() const { return fMapPath; }
 	const char*					dynamicRebaseInfoPath() const { return fDynamicRebaseInfoPath; }
+	bool						useDynamicRebase() const { return dynamicRebaseInfoPath() != nullptr; }
 	bool						positionIndependentExecutable() const { return fPositionIndependentExecutable; }
 	Options::FileInfo			findFileUsingPaths(const std::string &path) const;
 	bool						deadStripDylibs() const { return fDeadStripDylibs; }

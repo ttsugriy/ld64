@@ -766,7 +766,7 @@ void Resolver::doAtom(const ld::Atom& atom)
 		}
 	}
 
-	if ( _options.dynamicRebaseInfoPath() != nullptr) {
+	if ( _options.useDynamicRebase() ) {
 		if (atom.section().type() == Section::typeInitializerPointers ) {
 			_eagerRebaseRoots.insert(&atom);
 		}
@@ -1124,7 +1124,7 @@ public:
 
 void Resolver::resolveEagerRebaseAtoms()
 {
-	if ( _options.dynamicRebaseInfoPath() == nullptr )
+	if ( !_options.useDynamicRebase() )
 		return;
 
 	for (const auto root : _eagerRebaseRoots) {

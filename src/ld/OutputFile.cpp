@@ -3909,7 +3909,7 @@ void OutputFile::generateLinkEditInfo(ld::Internal& state)
 		}
 	}
 
-	if ( _options.dynamicRebaseInfoPath() != nullptr ) {
+	if ( _options.useDynamicRebase() ) {
 		assert(_options.dynamicRebaseInfoPath() && "Dynamic rebase info path is absent");
 		int fd = open(_options.dynamicRebaseInfoPath(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
 		if (fd == -1) {
@@ -4189,7 +4189,7 @@ void OutputFile::addDyldInfo(ld::Internal& state,  ld::Internal::FinalSection* s
 		if (log) {
 			printf("To rebase lazily(%d): %s, at @%p\n", atom->isRebaseLazily(), atom->name(), atom);
 		}
-		if (atom->isRebaseEagerly() || _options.dynamicRebaseInfoPath() == nullptr)  {
+		if (atom->isRebaseEagerly() || !_options.useDynamicRebase())  {
 			_rebaseInfo.emplace_back(rebaseType, address);
 		} else {
 			_lazyRebaseInfo.emplace_back(rebaseType, address);
