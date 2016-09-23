@@ -788,11 +788,13 @@ void InternalState::setSectionSizesAndAlignments()
 		else {
 			uint16_t maxAlignment = 0;
 			uint64_t offset = 0;
+			bool hasLazilyRebasedAtoms = false;
 			for (std::vector<const ld::Atom*>::iterator ait = sect->atoms.begin(); ait != sect->atoms.end(); ++ait) {
 				const ld::Atom* atom = *ait;
 				bool pagePerAtom = false;
 				uint32_t atomAlignmentPowerOf2 = atom->alignment().powerOf2;
 				uint32_t atomModulus = atom->alignment().modulus;
+				hasLazilyRebasedAtoms |= atom->isRebaseLazily();
 				if ( _options.pageAlignDataAtoms() && ( strncmp(atom->section().segmentName(), "__DATA", 6) == 0) ) {
 					// most objc sections cannot be padded
 					bool contiguousObjCSection = ( strncmp(atom->section().sectionName(), "__objc_", 7) == 0 );
@@ -857,6 +859,10 @@ void InternalState::setSectionSizesAndAlignments()
 			// to start on pointer sized boundary.
 			if ( sect->type() == ld::Section::typeCFI )
 				sect->alignment = 3;
+			// if section has atoms which have to be rebased lazily, the section has to be page
+			// aligned, so that its protection can be adjusted at runtime
+			if ( hasLazilyRebasedAtoms )
+				sect->alignment = 12;
 			if ( sect->type() == ld::Section::typeTLVDefs )
 				this->hasThreadLocalVariableDefinitions = true;
 		}
